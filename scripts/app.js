@@ -236,3 +236,23 @@ function loadSnippet(id) {
     // ... existing loadSnippet code ...
     updatePreview();
 }
+
+function updateConnectionStatus() {
+    const statusElement = document.getElementById('connection-status');
+    if (!statusElement) return;
+
+    if (navigator.onLine) {
+        statusElement.innerHTML = "🟢 Online";
+        statusElement.style.backgroundColor = "#f1fff0";
+    } else {
+        statusElement.innerHTML = "🔴 Offline";
+        statusElement.style.backgroundColor = "#fff0f0";
+    }
+}
+
+// Update status when online/offline events occur
+window.addEventListener('online', updateConnectionStatus);
+window.addEventListener('offline', updateConnectionStatus);
+
+// Initial check
+document.addEventListener('DOMContentLoaded', updateConnectionStatus);
