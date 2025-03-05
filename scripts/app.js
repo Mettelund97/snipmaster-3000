@@ -1,6 +1,24 @@
 // Add this near the top of your app.js file
 
 // Register the Service Worker
+
+function updateCaches() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration()
+            .then(registration => {
+                if (registration) {
+                    // Force the service worker to update
+                    registration.update();
+                }
+            });
+    }
+}
+
+// Add a refresh button to your app UI if you want
+const refreshButton = document.getElementById('refresh-app');
+if (refreshButton) {
+    refreshButton.addEventListener('click', updateCaches);
+}
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
