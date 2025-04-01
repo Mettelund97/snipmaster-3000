@@ -7,12 +7,17 @@ const DYNAMIC_CACHE = `snipmaster-dynamic-${CACHE_VERSION}`;
 const SNIPPETS_CACHE = `snipmaster-snippets-${CACHE_VERSION}`;
 
 // Files to cache initially (app shell)
-const APP_SHELL = [
+const CACHE_NAME = 'snipmaster-cache-v1';
+const INITIAL_CACHED_RESOURCES = [
     '/',
     '/index.html',
-    '/styles/main.css',
+    '/syles/main.css',
     '/scripts/app.js',
-    '/offline.html',
+    '/scripts/storage.js',  // Add this line
+    '/scripts/ui.js',       // Add this line
+    '/highlight.min.js',
+    '/highlight.styles.css',
+    '/offline.html'
 ];
 
 // Install event - cache app shell
@@ -224,4 +229,114 @@ function staleWhileRevalidate(event) {
                     return cachedResponse || fetchPromise;
                 });
         });
+}
+
+// service-worker.js - Add background sync
+
+// Add this listener for background sync
+self.addEventListener('sync', event => {
+    if (event.tag === 'sync-snippets') {
+        console.log('Background sync triggered');
+        event.waitUntil(syncSnippets());
+    }
+});
+
+// Sync function
+async function syncSnippets() {
+    try {
+        const snippetsToSync = await getSnippetsToSync();
+        if (snippetsToSync.length === 0) {
+            console.log('No snippets to sync');
+            return;
+        }
+        
+        console.log(`Syncing ${snippetsToSync.length} snippets in background`);
+        
+        for (const snippet of snippetsToSync) {
+            try {
+                await syncSnippet(snippet);
+                await markSnippetSynced(snippet.id);
+            } catch (error) {
+                console.error(`Failed to sync snippet ${snippet.id}:`, error);
+                // Let the sync process continue with other snippets
+            }
+        }
+        
+        console.log('Background sync completed');
+        
+    } catch (error) {
+        console.error('Background sync failed:', error);
+        // Rethrow to allow the system to retry later
+        throw error;
+    }
+}
+
+// Helper functions - using IndexedDB from service worker
+async function getSnippetsToSync() {
+    // Access IndexedDB directly from service worker
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('SnipMasterDB', 1);
+        
+        request.onerror = reject;
+        
+        request.onsuccess = event => {
+            const db = event.target.result;
+            const transaction = db.transaction('snippets', 'readonly');
+            const store = transaction.objectStore('snippets');
+            
+            // Get all snippets with pending sync status
+            const index = store.index('by-sync-status');
+            const query = index.getAll('pending');
+            
+            query.onsuccess = () => {
+                resolve(query.result);
+            };
+            
+            query.onerror = reject;
+        };
+    });
+}
+
+async function syncSnippet(snippet) {
+    // Mock server sync - in a real app, this would be an API call
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (Math.random() < 0.9) {
+                resolve({ success: true });
+            } else {
+                reject(new Error('Server error'));
+            }
+        }, 500);
+    });
+}
+
+async function markSnippetSynced(id) {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('SnipMasterDB', 1);
+        
+        request.onerror = reject;
+        
+        request.onsuccess = event => {
+            const db = event.target.result;
+            const transaction = db.transaction('snippets', 'readwrite');
+            const store = transaction.objectStore('snippets');
+            
+            const getRequest = store.get(id);
+            
+            getRequest.onsuccess = () => {
+                const snippet = getRequest.result;
+                if (snippet) {
+                    snippet.syncStatus = 'synced';
+                    const updateRequest = store.put(snippet);
+                    
+                    updateRequest.onsuccess = () => resolve();
+                    updateRequest.onerror = reject;
+                } else {
+                    resolve(); // Snippet not found, nothing to do
+                }
+            };
+            
+            getRequest.onerror = reject;
+        };
+    });
 }
